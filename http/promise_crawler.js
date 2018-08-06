@@ -3,15 +3,25 @@ const queryString = require('querystring')
 const url = 'http://202.114.18.218/Main.aspx'
 const cheerio = require('cheerio')
 
-const request = require('request')
 
-function f(Building_No,Room_Number) {
+function query(Building_No, Room_Number) {
+  var data = SetData(Building_No, Room_Number)
+  var option = SetOption(data)
+  HttpPost(option, data, url)
+    .then((str) => parse(str))
+    .then((e) => Connect_DB(e,Building_No, Room_Number))
+    .catch((err) => console.log(err))
+}
+
+query('沁苑12舍', 201)
+
+function SetData(Building_No, Room_Number) {
   var area = ''
-  if(/沁苑.*/.test(Building_No)){
+  if (/沁苑.*/.test(Building_No)) {
     area = '东区'
   }
-
-  var data = queryString.stringify({
+  console.log("载入宿舍信息:"+area+Building_No+Room_Number)
+  return queryString.stringify({
     '__EVENTTARGET': '',
     '__EVENTARGUMENT': '',
     '__LASTFOCUS': '',
@@ -20,32 +30,15 @@ function f(Building_No,Room_Number) {
     'programId': area,
     'txtyq': Building_No,
     'Txtroom': Room_Number,
-    'ImageButton1.x': parseInt(30*Math.random()+20), //20-50
-    'ImageButton1.y': parseInt(15*Math.random()+5), //5-20
-    'TextBox2': '2018-8-5 7:04:32',
-    'TextBox3': 168.0,
+    'ImageButton1.x': parseInt(30 * Math.random() + 20), //20-50
+    'ImageButton1.y': parseInt(15 * Math.random() + 5), //5-20
+    //'TextBox2': '2018-8-5 7:04:32',
+    //'TextBox3': 168.0,
   })
-  var options = {
-    url: 'http://202.114.18.218/Main.aspx',
-    method: 'POST',
-    json: true,
-    headers: {
-      Accept: `text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8`,
-      'Accept-Encoding': 'gzip, deflate',
-      'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8,ja;q=0.7',
-      'Cache-Control': 'max-age=0',
-      'Connection': 'keep-alive',
-      'Content-Length': data.length,
-      'Content-Type': 'application/x-www-form-urlencoded',
-      'Host': '202.114.18.218',
-      'Origin': 'http://202.114.18.218',
-      'Referer': 'http://202.114.18.218/Main.aspx',
-      'Upgrade-Insecure-Requests': 1,
-      'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_13_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/67.0.3396.99 Safari/537.36',
-    },
-    body: queryString.stringify(data)
-  }
-  var options2 = {
+}
+
+function SetOption(data) {
+  return {
     hostname: '202.114.18.218',
     port: 80,
     path: '/Main.aspx',
@@ -65,38 +58,63 @@ function f(Building_No,Room_Number) {
       'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_13_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/67.0.3396.99 Safari/537.36',
     }
   }
-  var output;
-  var req = http.request(options2, function (res) {
-    var str = '';
-    console.log('Status: ' + res.statusCode)
-    console.log('headers: ' + JSON.stringify(res.headers))
-    res.on('data', function (t) {
-      str += t.toString();
+}
+
+function HttpPost(option, data, url) {
+  return new Promise(function (resolve, reject) {
+    console.log('正在爬取' + url)
+    var req = http.request(option, function (res) {
+      var str = '';
+      console.log('响应结果:\nStatus: ' + res.statusCode)
+      console.log('headers: ' + JSON.stringify(res.headers))
+      res.on('data', function (t) {
+        str += t.toString();
+      })
+      res.on('end', function () {
+        console.log('请求结束!')
+        resolve(str)
+      })
     })
-    res.on('end', function () {
-      console.log('request over!')
-      output = parse(str);
+    req.on('error', (e) => {
+      reject(e);
     })
+    req.write(data)
+    req.end()
   })
-  req.on('error', () => console.error('error'))
-  req.write(data)
-  req.end()
+}
 
-  var $
-
-  function parse(str) {
-    $ = cheerio.load(str)
+function parse(str) {
+  return new Promise(function (resolve, reject) {
+    if(/.*不存在该户信息.*/.test(str)){
+      reject('此次查询无数据:不存在该户信息');
+    }
+    $ = cheerio.load(str,{decodeEntities: false})
     var e = []
     var reg = /.*<td>([^<]*)<\/td><td>([^<]*)<\/td>/
     for (var i = 2; i <= 8; i++) {
       reg.exec($('#GridView2').find('tr:nth-of-type(' + i + ')').html())
-      console.log(RegExp.$1, ' ', RegExp.$2, '\n')
       e.push({
         elec_value: RegExp.$1,
         elec_date: RegExp.$2
       })
     }
-    return e;
-  }
+    //可能有新的缴费
+    var reg2 = /.*<td>([^<]*)<\/td><td>([^<]*)<\/td><td>([^<]*)<\/td>/
+    if(reg2.exec($('#GridView1').find('tr:nth-of-type(' + 2 + ')').html())){
+      var new_date = RegExp.$1, new_value = RegExp.$3.match(/.*购\(用\)量：(.*)单价.*/)[1].trim()
+      if(new Date(new_date) > new Date( e[0].elec_date)){
+        e.unshift({
+          elec_value: (parseFloat(e[0].elec_value)+parseFloat(new_value)).toString(),
+          elec_date: new_date
+        })
+      }
+    }
+    
+    resolve(e)
+  })
 }
-module.exports.elec_query = f
+
+function Connect_DB(e,Building_No, Room_Number) {
+  console.log('要存储的数据:\n')
+  console.log(e)
+}
