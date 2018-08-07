@@ -8,19 +8,25 @@ function query(Building_No, Room_Number) {
   var data = SetData(Building_No, Room_Number)
   var option = SetOption(data)
   HttpPost(option, data, url)
-    .then((str) => parse(str))
-    .then((e) => Connect_DB(e,Building_No, Room_Number))
+    .then((str) => parse(str,Building_No, Room_Number))
+    .then((e) => Connect_DB(e, Building_No, Room_Number))
     .catch((err) => console.log(err))
 }
-
-query('沁苑12舍', 201)
+// for(var i = 9 ;i<=13;i++){
+//   for(var j = 1; j<=6 ;j++ ){
+//     for(var k = 1 ; k<=32 ;k++){
+//       query('沁苑'+i+'舍', j*100+k)
+//     }
+//   }
+// }
+query('沁苑12舍',220)
 
 function SetData(Building_No, Room_Number) {
   var area = ''
   if (/沁苑.*/.test(Building_No)) {
     area = '东区'
   }
-  console.log("载入宿舍信息:"+area+Building_No+Room_Number)
+  console.log("载入宿舍信息:" + area + Building_No + Room_Number)
   return queryString.stringify({
     '__EVENTTARGET': '',
     '__EVENTARGUMENT': '',
@@ -66,7 +72,7 @@ function HttpPost(option, data, url) {
     var req = http.request(option, function (res) {
       var str = '';
       console.log('响应结果:\nStatus: ' + res.statusCode)
-      console.log('headers: ' + JSON.stringify(res.headers))
+      //console.log('headers: ' + JSON.stringify(res.headers))
       res.on('data', function (t) {
         str += t.toString();
       })
@@ -83,12 +89,12 @@ function HttpPost(option, data, url) {
   })
 }
 
-function parse(str) {
+function parse(str,Building_No, Room_Number) {
   return new Promise(function (resolve, reject) {
-    if(/.*不存在该户信息.*/.test(str)){
-      reject('此次查询无数据:不存在该户信息');
+    if (/.*不存在该户信息.*/.test(str)) {
+      reject('此次查询无数据:不存在该户信息 '+Building_No+Room_Number);
     }
-    $ = cheerio.load(str,{decodeEntities: false})
+    $ = cheerio.load(str, { decodeEntities: false })
     var e = []
     var reg = /.*<td>([^<]*)<\/td><td>([^<]*)<\/td>/
     for (var i = 2; i <= 8; i++) {
@@ -100,21 +106,25 @@ function parse(str) {
     }
     //可能有新的缴费
     var reg2 = /.*<td>([^<]*)<\/td><td>([^<]*)<\/td><td>([^<]*)<\/td>/
-    if(reg2.exec($('#GridView1').find('tr:nth-of-type(' + 2 + ')').html())){
-      var new_date = RegExp.$1, new_value = RegExp.$3.match(/.*购\(用\)量：(.*)单价.*/)[1].trim()
-      if(new Date(new_date) > new Date( e[0].elec_date)){
-        e.unshift({
-          elec_value: (parseFloat(e[0].elec_value)+parseFloat(new_value)).toString(),
-          elec_date: new_date
-        })
+    for (var i = 2; i <= 8; i++) {
+      if (reg2.exec($('#GridView1').find('tr:nth-of-type(' + i + ')').html())) {
+        var new_date = RegExp.$1, new_value = RegExp.$3.match(/.*购\(用\)量：(.*)单价.*/)[1].trim()
+        if (new Date(new_date) > new Date(e[0].elec_date)) {
+          e.unshift({
+            elec_value: (parseFloat(e[0].elec_value) + parseFloat(new_value)).toString(),
+            elec_date: new_date
+          })
+        }
+      }
+      else {
+        break
       }
     }
-    
     resolve(e)
   })
 }
 
-function Connect_DB(e,Building_No, Room_Number) {
-  console.log('要存储的数据:\n')
+function Connect_DB(e, Building_No, Room_Number) {
+  console.log('要存储的数据:\t'+Building_No+Room_Number)
   console.log(e)
 }
