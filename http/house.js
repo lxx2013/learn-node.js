@@ -1,5 +1,3 @@
-const http = require('http')
-const queryString = require('querystring')
 var url = {};
 url.login_url = 'http://119.97.201.28:6081/chktest2.aspx?gid=E5FD011F-2B50-4E9D-A9E4-23BF6FBFADF2'
 url.target_url = 'http://119.97.201.28:6081/ShowPrice.aspx?gid=E5FD011F-2B50-4E9D-A9E4-23BF6FBFADF2&ch='
