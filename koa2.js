@@ -25,8 +25,9 @@ router.get('/wechat-hear', (ctx) => {
     echostr
   } = ctx.query
   const str = [token, timestamp, nonce].sort().join('')
+  console.log('begin sha1')
   const sha = sha1(str)
-  console.log(sha)
+  console.log('sha: '+sha)
   if (sha === signature) {
     ctx.body = echostr
   } else {
