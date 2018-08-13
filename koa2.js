@@ -3,7 +3,7 @@ const app = new Koa()
 const fs = require('fs')
 const Router = require('koa-router')
 const serve = require('koa-static')
-const sha = require('sha1')
+const sha1 = require('sha1')
 
 var router = new Router()
 router.get('/', ctx => {
