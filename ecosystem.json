@@ -16,7 +16,7 @@
             "host": ["120.79.3.108"],
             "ref": "origin/master",
             "repo": "git@github.com:lxx2013/learn-node.js.git",
-            "path": "/home/www/ice/production",
+            "path": "/home/www/ice/learn-node.js",
             "ssh_options": "StrictHostKeyChecking=no",
             "pre-deploy-local": "echo 'Deploy Done!'",
             "env": {
