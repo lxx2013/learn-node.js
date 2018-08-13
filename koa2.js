@@ -3,6 +3,7 @@ const app = new Koa()
 const fs = require('fs')
 const Router = require('koa-router')
 const serve = require('koa-static')
+const sha = require('sha1')
 
 var router = new Router()
 router.get('/', ctx => {
@@ -24,7 +25,7 @@ router.get('/wechat-hear', (ctx) => {
     echostr
   } = ctx.query
   const str = [token, timestamp, nonce].sort().join('')
-  const sha = str//sha1(str)
+  const sha = sha1(str)
   console.log(sha)
   if (sha === signature) {
     ctx.body = echostr
